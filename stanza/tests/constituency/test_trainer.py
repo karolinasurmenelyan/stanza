@@ -398,3 +398,82 @@ class TestTrainer:
             bert_model, bert_tokenizer = foundation_cache.load_bert(bert_model_name)
             trained_model = trainer.Trainer.load(args['save_name'], foundation_cache=foundation_cache)
             assert trained_model.model.bert_model is bert_model
+
+
+    def test_bert_finetune_one_epoch(self, wordvec_pretrain_file):
+        """
+        Check that the parameters the bert model DO change over a single training step
+        """
+        with tempfile.TemporaryDirectory(dir=TEST_WORKING_DIR) as tmpdirname:
+            bert_model_name = 'hf-internal-testing/tiny-bert'
+            args = ['--bert_model', bert_model_name, '--bert_finetune', '--optim', 'adadelta']
+            args, trained_model = self.run_train_test(wordvec_pretrain_file, tmpdirname, num_epochs=1, extra_args=args)
+            bert_model, bert_tokenizer = load_bert(bert_model_name)
+            assert not self.bert_weights_allclose(bert_model, trained_model)
+
+            # double check that a new bert is created instead of using the FoundationCache when the bert has been trained
+            foundation_cache = FoundationCache()
+            bert_model, bert_tokenizer = foundation_cache.load_bert(bert_model_name)
+            model_name = args['save_name']
+            assert os.path.exists(model_name)
+            tr = trainer.Trainer.load(model_name, foundation_cache=foundation_cache)
+            assert tr.model.bert_model is not bert_model
+            assert not self.bert_weights_allclose(bert_model, tr)
+            assert self.bert_weights_allclose(trained_model.model.bert_model, tr)
+
+    def test_bert_finetune(self, wordvec_pretrain_file):
+        """
+        Check that the parameters the bert model DO change when using bert_finetune
+        """
+        with tempfile.TemporaryDirectory(dir=TEST_WORKING_DIR) as tmpdirname:
+            bert_model_name = 'hf-internal-testing/tiny-bert'
+            args = ['--bert_model', bert_model_name, '--bert_finetune', '--optim', 'adamw']
+            args, trained_model = self.run_train_test(wordvec_pretrain_file, tmpdirname, extra_args=args)
+            bert_model, bert_tokenizer = load_bert(bert_model_name)
+            assert not self.bert_weights_allclose(bert_model, trained_model)
+
+            # double check that a new bert is created instead of using the FoundationCache when the bert has been trained
+            foundation_cache = FoundationCache()
+            bert_model, bert_tokenizer = foundation_cache.load_bert(bert_model_name)
+            no_finetune_args = self.training_args(wordvec_pretrain_file, tmpdirname, None, None, "--no_bert_finetune", "--no_stage1_bert_finetune", '--bert_model', bert_model_name)
+            trained_model = trainer.Trainer.load(args['save_name'], args=no_finetune_args, foundation_cache=foundation_cache)
+            assert not trained_model.model.args['bert_finetune']
+            assert not trained_model.model.args['stage1_bert_finetune']
+            assert trained_model.model.bert_model is not bert_model
+
+
+    def test_stage1_bert_finetune(self, wordvec_pretrain_file):
+        """
+        Check that the parameters the bert model DO change when using stage1_bert_finetune, but only for the first couple steps
+        """
+        with tempfile.TemporaryDirectory(dir=TEST_WORKING_DIR) as tmpdirname:
+            bert_model_name = 'hf-internal-testing/tiny-bert'
+            args = ['--bert_model', bert_model_name, '--stage1_bert_finetune', '--optim', 'adamw']
+            # need to use num_epochs==6 so that epochs 1 and 2 are saved to be different
+            # a test of 5 or less means that sometimes it will reload the params
+            # at step 2 to get ready for the following iterations with adamw
+            args, trained_model = self.run_train_test(wordvec_pretrain_file, tmpdirname, num_epochs=6, extra_args=args)
+            bert_model, bert_tokenizer = load_bert(bert_model_name)
+            assert not self.bert_weights_allclose(bert_model, trained_model)
+
+            # double check that a new bert is created instead of using the FoundationCache when the bert has been trained
+            foundation_cache = FoundationCache()
+            bert_model, bert_tokenizer = foundation_cache.load_bert(bert_model_name)
+            no_finetune_args = self.training_args(wordvec_pretrain_file, tmpdirname, None, None, "--no_bert_finetune", "--no_stage1_bert_finetune", '--bert_model', bert_model_name, '--optim', 'adamw')
+            num_epochs = trained_model.model.args['epochs']
+            each_name = os.path.join(tmpdirname, 'each_%02d.pt')
+            for i in range(1, num_epochs+1):
+                model_name = each_name % i
+                assert os.path.exists(model_name)
+                tr = trainer.Trainer.load(model_name, args=no_finetune_args, foundation_cache=foundation_cache)
+                assert tr.model.bert_model is not bert_model
+                assert not self.bert_weights_allclose(bert_model, tr)
+                if i >= num_epochs // 2:
+                    assert self.bert_weights_allclose(trained_model.model.bert_model, tr)
+
+            # verify that models 1 and 2 are saved to be different
+            model_name_1 = each_name % 1
+            model_name_2 = each_name % 2
+            tr_1 = trainer.Trainer.load(model_name_1, args=no_finetune_args, foundation_cache=foundation_cache)
+            tr_2 = trainer.Trainer.load(model_name_2, args=no_finetune_args, foundation_cache=foundation_cache)
+            assert not self.bert_weights_allclose(tr_1.model.bert_model, tr_2)
