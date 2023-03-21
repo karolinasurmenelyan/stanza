@@ -256,6 +256,7 @@ from stanza.utils.datasets.sentiment import process_slsd
 from stanza.utils.datasets.sentiment import process_sst
 from stanza.utils.datasets.sentiment import process_usage_german
 from stanza.utils.datasets.sentiment import process_vsfc_vietnamese
+from stanza.utils.datasets.sentiment import process_SemEval_2017_armenian
 
 from stanza.utils.datasets.sentiment import process_utils
 
@@ -384,6 +385,10 @@ def convert_ren(paths, dataset_name, *args):
     out_directory = paths['SENTIMENT_DATA_DIR']
     process_ren_chinese.main(in_directory, out_directory, dataset_name)
 
+def convert_hy_SemEval_2017(paths, dataset_name):
+    process_SemEval_2017_armenian.convert_SemEval_2017(paths['SENTIMENT_BASE'], paths['SENTIMENT_DATA_DIR'], dataset_name)
+
+
 DATASET_MAPPING = {
     "de_sb10k":     convert_sb10k,
     "de_scare":     convert_scare,
@@ -404,6 +409,8 @@ DATASET_MAPPING = {
     "vi_vsfc":      convert_vi_vsfc,
 
     "zh-hans_ren":  convert_ren,
+
+    "hy_SemEval2017Task4translated": convert_hy_SemEval_2017
 }
 
 def main(dataset_name, *args):
