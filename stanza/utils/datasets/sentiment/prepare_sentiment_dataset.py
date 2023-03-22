@@ -236,6 +236,34 @@ it_sentipolc16
 
 another option not implemented yet: absita18
   http://sag.art.uniroma2.it/absita/data/
+
+
+Armenian
+-------
+
+hy_SemEval2017Task4translated
+
+train set file: https://github.com/nigkal/ArmenianNLP/blob/main/BERT/Data/SentimentTrain_B.csv
+test set file: https://github.com/nigkal/ArmenianNLP/blob/main/BERT/Data/SentimentTest_B.csv
+
+The dataset has only 2 labels: positive and negative
+
+Download these files as follows:
+wget https://raw.githubusercontent.com/nigkal/ArmenianNLP/main/BERT/Data/SentimentTest_B.csv
+wget https://raw.githubusercontent.com/nigkal/ArmenianNLP/main/BERT/Data/SentimentTrain_B.csv
+
+And move them to the following path:
+$SENTIMENT_BASE/armenian/semeval2017task4translated
+
+So that they have the following path:
+$SENTIMENT_BASE/armenian/semeval2017task4translated/SentimentTrain_B.csv
+$SENTIMENT_BASE/armenian/semeval2017task4translated/SentimentTest_B.csv
+
+Don't worry about no dev set, we'll get it during file processing by splitting train set by train and dev with a
+ratio of ~90% and ~10%.
+
+Run this for processing data to .json:
+python3 stanza.utils.datasets.sentiment.prepare_sentiment_dataset.py hy_SemEval2017Task4translated
 """
 
 import os
