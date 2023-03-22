@@ -2,6 +2,26 @@ import os
 import stanza
 from stanza.utils import default_paths
 from stanza.utils.datasets.sentiment.process_utils import SentimentDatum, write_dataset
+import pandas as pd
+
+
+def split_train_dev(train_filename, dev_filename):
+    """
+    splitting train data into train and dev with a ratio of ~90% and ~10%.
+    """
+    train_sample_count = 16060 #90%
+    train_file_reader = pd.read_csv(train_filename, chunksize=train_sample_count)
+    os.remove(train_filename)
+    header = ['Column0', 'Column1', 'Column2', 'Column3', 'Column4']
+    for i, chunk in enumerate(train_file_reader):
+        if i == 0:
+            chunk.to_csv(train_filename, index=False, header=header)
+        if i == 1:
+            chunk.to_csv(dev_filename, index=False, header=header)
+    dev_file_reader = pd.read_csv(dev_filename)
+    examples_count = len(dev_file_reader)
+    dev_file_reader['Column0'] = [i for i in range(examples_count)]
+    dev_file_reader.to_csv(dev_filename, index=False, header=header)
 
 
 def convert_label(label):
@@ -59,6 +79,7 @@ def read_file(filename, pipe):
     sentiment_data = tokenize(sentiment_data, pipe)
     return sentiment_data
 
+
 def convert_SemEval_2017(in_directory, out_directory, dataset_name):
     """
     Read all of the data from in_directory/armenian/dataset_name, write it to out_directory...
@@ -67,14 +88,15 @@ def convert_SemEval_2017(in_directory, out_directory, dataset_name):
 
     pipe = stanza.Pipeline(lang="hy", processors="tokenize", tokenize_no_ssplit=True)
 
+    train_filename = os.path.join(in_directory, "SentimentTrain_B.csv")
+    train = read_file(train_filename, pipe)
+
     test_filename = os.path.join(in_directory, "SentimentTest_B.csv")
     test = read_file(test_filename, pipe)
 
     dev_filename = os.path.join(in_directory, "SentimentDev_B.csv")
+    split_train_dev(train_filename=train_filename, dev_filename=dev_filename)
     dev = read_file(dev_filename, pipe)
-
-    train_filename = os.path.join(in_directory, "SentimentTrain_B.csv")
-    train = read_file(train_filename, pipe)
 
     print("Total train items: %8d" % len(train))
     print("Total dev items:   %8d" % len(dev))
